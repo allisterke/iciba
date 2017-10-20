@@ -14,7 +14,7 @@ class JsonCache {
     async queryAll() {
         for(let i = 0; i < this.words.length; ++ i) {
             await this.query(i);
-            await delay(10000);
+            await delay(1000);
         }
     }
     async query(i) {
@@ -121,6 +121,7 @@ class MasterIciba {
             ph.push(json.baesInfo.symbols[0].ph_am_mp3);
             ph.push(json.baesInfo.symbols[0].ph_tts_mp3);
         } catch (e) { console.log(e); }
+        ph = ph.filter((a) => { return a != null && a.trim() != '' });
         return ph.length == 0 ? null : ph[Math.floor(Math.random() * ph.length)];
     }
     parse(json) {
@@ -181,7 +182,6 @@ class MasterIciba {
             audios.push(audio);
 
             div.appendChild(audio);
-            div.appendChild(document.createElement('br'));
             div.appendChild(text);
             container.appendChild(div);
         }
