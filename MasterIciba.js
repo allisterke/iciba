@@ -1,75 +1,77 @@
+function delay(t) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, t);
+    })
+}
+
+class JsonCache {
+    constructor(words) {
+        this.queryUrl = 'index.php?a=getWordMean&c=search&list=1%2C2%2C3%2C4%2C5%2C8%2C9%2C10%2C12%2C13%2C14%2C15%2C18%2C21%2C22%2C24%2C3003%2C3004%2C3005&word=';
+        this.words = words;
+        this.cache = [];
+        this.queryAll().then(()=>{ console.log('finished querying all words.'); });
+    }
+    async queryAll() {
+        for(let i = 0; i < this.words.length; ++ i) {
+            await this.query(i);
+            await delay(10000);
+        }
+    }
+    async query(i) {
+        if(i >= this.words.length) {
+            return;
+        }
+        if(typeof this.cache[i] !== 'undefined') {
+            return;
+        }
+        this.cache[i] = null;
+        try {
+            let resp = await fetch(`${this.queryUrl}${this.words[i]}`);
+            let json = await resp.json();
+            this.cache[i] = json;
+        } catch (e) {
+            this.cache[i] = {};
+        }
+    }
+    get(i) {
+        if(i < this.words.length) {
+            if(typeof this.cache[i] === 'undefined') {
+                this.query(i);
+            }
+            return this.cache[i];
+        }
+        else {
+            return {};
+        }
+    }
+}
+
 class MasterIciba {
     constructor(text) {
         this.words = text.split(/[\r\n]+/);
         // this.words = this.words.slice(0, this.words.length - 1).sort();
-        this.words = this.shuffle(this.words.slice(0, this.words.length - 1)).slice(0, 100).sort();
+        this.words = this.shuffle(this.words.slice(0, this.words.length - 1)).slice(0, 10).sort();
+        this.jsonCache = new JsonCache(this.words);
+
         this.initList();
 
         this.playedWords = [];
 
-        this.audios = [];
-        this.handle = null;
-        this.paused = false;
         this.bindKeyEventHandlers();
 
-        this.wordIndex = 0;
-        this.exampleIndex = 0;
-        this.playNextWord();
+        this.playAll().then(() => { console.log('all played'); });
     }
     bindKeyEventHandlers() {
+        this.paused = false;
         window.onkeydown = this.handleKeyEvent.bind(this);
     }
     handleKeyEvent(e) {
         if(e.keyCode == 37) {
-            if(this.wordIndex > 1) {
-                this.paused = false;
-                this.stop(true);
-                this.wordIndex -= 2;
-                document.getElementById('list').firstElementChild.insertBefore(this.playedWords.pop(), document.getElementById('list').firstElementChild.firstElementChild);
-                if(this.playedWords.length > 0) {
-                    document.getElementById('list').firstElementChild.insertBefore(this.playedWords.pop(), document.getElementById('list').firstElementChild.firstElementChild);
-                }
-                console.log(this.wordIndex);
-                this.playNextWord();
-            }
         }
         else if(e.keyCode == 39) {
-            this.paused = false;
-            this.stop(true);
-            this.playNextWord();
         }
         else if(e.keyCode == 13) {
             this.paused = !this.paused;
-            if(this.paused) {
-                this.stop(false);
-            }
-            else {
-                if(this.fetched) {
-                    this.playNextExample();
-                }
-            }
-        }
-    }
-    stop(pause) {
-        if(this.handle) {
-            clearInterval(this.handle);
-            this.handle = null;
-        }
-        else {
-            let j = this.exampleIndex - 1;
-            if (j >= 0 && j < this.audios.length) {
-                if(pause) {
-                    this.audios[j].pause();
-                }
-                this.audios[j].onended = this.audios[j].onerror = null;
-            }
-
-            if(this.audio) {
-                if(pause) {
-                    this.audio.pause();
-                }
-                this.audio.onended = this.audio.onerror = null;
-            }
         }
     }
     initList() {
@@ -91,7 +93,7 @@ class MasterIciba {
         }
         document.getElementById('list').appendChild(container);
     }
-    parseph(json) {
+    parsePh(json) {
         let ph = [];
         try {
             ph.push(json.baesInfo.symbols[0].ph_en_mp3);
@@ -167,72 +169,53 @@ class MasterIciba {
         return audios;
     }
 
-    playNextWord() {
-        this.audios = [];
-        this.fetched = false;
+    async playAll() {
+        for (let i = 0; i < this.words.length; ++i) {
+            let word = this.words[i];
+            document.title = word;
+            // if (i > 0) {
+            //     this.playedWords.push(document.getElementById('list').firstElementChild.firstElementChild);
+            //     document.getElementById('list').firstElementChild.removeChild(document.getElementById('list').firstElementChild.firstElementChild);
+            // }
+            //            document.body.firstElementChild.firstElementChild.children[i].scrollIntoView(false);
+            //            document.body.firstElementChild.firstElementChild.children[i].style.fontWeight = 'bold';
 
-        let i = this.wordIndex ++;
-        if (i >= this.words.length) {
-            return;
-        }
-        let word = this.words[i];
-        document.title = word;
-        if (i > 0) {
-            this.playedWords.push(document.getElementById('list').firstElementChild.firstElementChild);
-            document.getElementById('list').firstElementChild.removeChild(document.getElementById('list').firstElementChild.firstElementChild);
-        }
-        //            document.body.firstElementChild.firstElementChild.children[i].scrollIntoView(false);
-        //            document.body.firstElementChild.firstElementChild.children[i].style.fontWeight = 'bold';
-        fetch(`index.php?a=getWordMean&c=search&list=1%2C2%2C3%2C4%2C5%2C8%2C9%2C10%2C12%2C13%2C14%2C15%2C18%2C21%2C22%2C24%2C3003%2C3004%2C3005&word=${word}`).then(
-            (resp) => {
-                if (resp.ok) {
-                    resp.json().then((json) => {
-                        if(i+1 != this.wordIndex) {
-                            return;
-                        }
-                        this.fetched = true;
-
-                        this.updateTitle(json);
-                        this.audios = this.render(this.parse(json));
-
-                        this.resetExampleIndex();
-
-                        if(this.paused) {
-                            return;
-                        }
-                        this.playPh(this.parseph(json));
-                        // this.playNextExample();
-                    });
-                }
-                else {
-                    if(i+1 != this.wordIndex) {
-                        return;
+            let json = {};
+            try {
+                while (true) {
+                    json = this.jsonCache.get(i);
+                    if (json) {
+                        break;
                     }
-                    playNextWord();
+                    else {
+                        await delay(1000);
+                    }
+                }
+            } catch (e) {
+            }
+
+            this.updateTitle(json);
+            let audios = this.render(this.parse(json));
+
+            audios = [this.createPh(this.parsePh(json))].concat(audios);
+
+            for(let j = 0; j < audios.length; ++ j) {
+                if(j > 0) {
+                    this.highLightExample(j - 1);
+                }
+                await this.play(audios[j]);
+                await delay(2000);
+                while (this.paused) {
+                    await delay(500);
                 }
             }
-        )
-    }
-
-    playPh(ph) {
-        if(ph) {
-            this.audio = document.createElement('audio');
-            this.audio.src = ph;
-            this.audio.onended = this.audio.onerror = () => {
-                this.audio = null;
-                this.handle = setTimeout(() => {
-                    this.playNextExample();
-                }, 1000);
-            }
-            this.audio.play();
-        }
-        else {
-            this.playNextExample();
         }
     }
 
-    resetExampleIndex() {
-        this.exampleIndex = 0;
+    createPh(ph) {
+        let audio = document.createElement('audio');
+        audio.src = ph;
+        return audio;
     }
 
     updateTitle(json) {
@@ -259,19 +242,15 @@ class MasterIciba {
         document.getElementById(id).scrollIntoView(false);
     }
 
-    playNextExample() {
-        this.handle = null;
-        let j = this.exampleIndex ++;
-        if (j < this.audios.length) {
-            this.audios[j].onended = this.audios[j].onerror = () => {
-                //                            document.getElementById(id).style.fontWeight = '';
-                this.handle = setTimeout(() => { this.playNextExample(); }, 2000);
-            };
-            this.highLightExample(j);
-            this.audios[j].play();
-        }
-        else {
-            this.handle = setTimeout(() => { this.playNextWord(); }, 1000 );
+    async play(audio) {
+        audio.play();
+        while(true) {
+            if(audio.ended || audio.error) {
+                break;
+            }
+            else {
+                await delay(1000);
+            }
         }
     };
 
