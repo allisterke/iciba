@@ -220,6 +220,12 @@ class MasterIciba {
             this.updateTitle(json);
 
             let audios = this.render(this.parse(json));
+            if(audios.length == 0) {
+                document.getElementById('title').scrollIntoView();
+            }
+            else {
+                this.highLightExample(0);
+            }
             audios = [this.createPh(this.parsePh(json))].concat(audios);
 
             for(let j = 0; j < audios.length; ++ j) {
@@ -270,8 +276,6 @@ class MasterIciba {
                 json.baesInfo.symbols[0].parts.map((e) => {
                     return `<div>${e.part} ${e.means.join(', ')}</div>`;
                 }).join('');
-
-            document.getElementById('title').scrollIntoView();
         } catch (e) {
             console.log(e);
         }
