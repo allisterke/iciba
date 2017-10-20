@@ -50,36 +50,44 @@ class MasterIciba {
     constructor(text) {
         this.words = text.split(/[\r\n]+/);
         // this.words = this.words.slice(0, this.words.length - 1).sort();
-        this.words = this.shuffle(this.words.slice(0, this.words.length - 1)).slice(0, 10).sort();
+        this.words = this.shuffle(this.words.slice(0, this.words.length - 1)).slice(0, 100).sort();
         this.jsonCache = new JsonCache(this.words);
 
-        this.initList();
-
-        this.playedWords = [];
+        this.updateList(0);
 
         this.bindKeyEventHandlers();
 
-        this.playAll().then(() => { console.log('all played'); });
+        this.currentWord = 0;
+        this.playAll(0);
     }
     bindKeyEventHandlers() {
+        this.backward = false;
+        this.forward = false;
         this.paused = false;
+        this.epoch = 0; // when forward or backward key is pressed, we enter into a new era
         window.onkeydown = this.handleKeyEvent.bind(this);
     }
     handleKeyEvent(e) {
         if(e.keyCode == 37) {
+            ++ this.epoch;
+            this.paused = false;
+            this.playAll(Math.max(this.currentWord - 1, 0));
         }
         else if(e.keyCode == 39) {
+            ++ this.epoch;
+            this.paused = false;
+            this.playAll(this.currentWord + 1 >= this.words.length ? 0 : this.currentWord + 1);
         }
         else if(e.keyCode == 13) {
             this.paused = !this.paused;
         }
     }
-    initList() {
+    updateList(start) {
         let container = document.createElement('table');
         container.border = '1';
         container.cellSpacing = '0';
         container.cellPadding = '0';
-        for(let i = 0; i < this.words.length; ++ i) {
+        for(let i = start; i < this.words.length; ++ i) {
             let item = document.createElement('tr');
             let id = document.createElement('td');
             id.style.padding = '1em';
@@ -91,6 +99,19 @@ class MasterIciba {
             item.appendChild(content);
             container.appendChild(item);
         }
+        for(let i = 0; i < start; ++ i) {
+            let item = document.createElement('tr');
+            let id = document.createElement('td');
+            id.style.padding = '1em';
+            id.innerHTML = i+1;
+            let content = document.createElement('td');
+            content.style.padding = '1em';
+            content.innerHTML = this.words[i];
+            item.appendChild(id);
+            item.appendChild(content);
+            container.appendChild(item);
+        }
+        document.getElementById('list').innerHTML = '';
         document.getElementById('list').appendChild(container);
     }
     parsePh(json) {
@@ -169,18 +190,14 @@ class MasterIciba {
         return audios;
     }
 
-    async playAll() {
-        for (let i = 0; i < this.words.length; ++i) {
-            let word = this.words[i];
-            document.title = word;
-            // if (i > 0) {
-            //     this.playedWords.push(document.getElementById('list').firstElementChild.firstElementChild);
-            //     document.getElementById('list').firstElementChild.removeChild(document.getElementById('list').firstElementChild.firstElementChild);
-            // }
-            //            document.body.firstElementChild.firstElementChild.children[i].scrollIntoView(false);
-            //            document.body.firstElementChild.firstElementChild.children[i].style.fontWeight = 'bold';
+    async playAll(start) {
+        let epoch = this.epoch;
 
-            let json = {};
+        for (let i = start; i < this.words.length; ++i) {
+            this.currentWord = i;
+
+            let word = this.words[i];
+            let json = null;
             try {
                 while (true) {
                     json = this.jsonCache.get(i);
@@ -189,24 +206,52 @@ class MasterIciba {
                     }
                     else {
                         await delay(1000);
+                        if(epoch != this.epoch) { // play is rescheduled
+                            return;
+                        }
                     }
                 }
             } catch (e) {
+                json = {};
             }
 
+            document.title = word;
+            this.updateList(i);
             this.updateTitle(json);
-            let audios = this.render(this.parse(json));
 
+            let audios = this.render(this.parse(json));
             audios = [this.createPh(this.parsePh(json))].concat(audios);
 
             for(let j = 0; j < audios.length; ++ j) {
+                if(epoch != this.epoch) { // play is rescheduled
+                    return;
+                }
                 if(j > 0) {
+                    console.log(`high light ${i}, ${j}`);
                     this.highLightExample(j - 1);
                 }
-                await this.play(audios[j]);
+
+                let audio = audios[j];
+                audio.play();
+                while(true) {
+                    if(audio.ended || audio.error) {
+                        break;
+                    }
+                    else {
+                        await delay(1);
+                        if(epoch != this.epoch) { // stop playing
+                            audio.pause();
+                            break;
+                        }
+                    }
+                }
+
                 await delay(2000);
                 while (this.paused) {
                     await delay(500);
+                }
+                if(epoch != this.epoch) { // play is rescheduled
+                    return;
                 }
             }
         }
@@ -241,18 +286,6 @@ class MasterIciba {
         //                        location.href = `#${id}`;
         document.getElementById(id).scrollIntoView(false);
     }
-
-    async play(audio) {
-        audio.play();
-        while(true) {
-            if(audio.ended || audio.error) {
-                break;
-            }
-            else {
-                await delay(1000);
-            }
-        }
-    };
 
     shuffle(a) {
         for (let i = 0; i < a.length; ++i) {
