@@ -2,7 +2,7 @@ class MasterIciba {
     constructor(text) {
         this.words = text.split(/[\r\n]+/);
         // this.words = this.words.slice(0, this.words.length - 1).sort();
-        this.words = this.shuffle(this.words.slice(0, Math.min(this.words.length - 1, 100)));
+        this.words = this.shuffle(this.words.slice(0, this.words.length - 1)).slice(0, 100).sort();
         this.initList();
 
         this.playedWords = [];
@@ -243,7 +243,7 @@ class MasterIciba {
                     return `<div>${e.part} ${e.means.join(', ')}</div>`;
                 }).join('');
 
-            // document.getElementById('title').scrollIntoView();
+            document.getElementById('title').scrollIntoView();
         } catch (e) {
             console.log(e);
         }
