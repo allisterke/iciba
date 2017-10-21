@@ -40,11 +40,17 @@ server {
 		# include /etc/nginx/naxsi.rules
 	}
 
-	location /index.php {
+	location = /index.php {
 		if ($prefix = iciba) {
 			proxy_pass http://www.iciba.com;
 		}
 	}
+
+#    if your link has a prefix like /iciba, then rewrite before proxy
+#    location = /iciba/index.php {
+#        rewrite /iciba(.*) $1 break;
+#        proxy_pass http://www.iciba.com;
+#    }
 
 
 	autoindex on;
