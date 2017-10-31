@@ -266,6 +266,9 @@ class MasterIciba {
     createPh(ph) {
         let audio = document.createElement('audio');
         audio.src = ph;
+        audio.controls = true;
+        audio.style.paddingTop = '1em';
+        document.getElementById('title').appendChild(audio);
         return audio;
     }
 
